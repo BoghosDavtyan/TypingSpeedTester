@@ -4,7 +4,8 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.clock import Clock
-import random
+from random_word import RandomWords
+import time
 
 
 class FocusTextInput(TextInput):
@@ -17,13 +18,14 @@ class FocusTextInput(TextInput):
 
 class TypeTestApp(App):
     def build(self):
-        self.words = ["python", "kivy", "application", "development", "programming", "computer", "science", "algorithm",
-                      "interface", "software"]
+        self.r = RandomWords()
         self.current_word = ""
         self.time_left = 60
         self.words_typed = 0
         self.accuracy = 100
         self.game_active = False
+        self.start_time = 0
+        self.wpm = 0
 
         layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
 
@@ -40,7 +42,7 @@ class TypeTestApp(App):
         self.start_button = Button(text="Start", on_press=self.start_game)
         layout.add_widget(self.start_button)
 
-        self.stats_label = Label(text="Words typed: 0 | Accuracy: 100%")
+        self.stats_label = Label(text="Words typed: 0 | Accuracy: 100% | WPM: 0")
         layout.add_widget(self.stats_label)
 
         return layout
@@ -52,12 +54,16 @@ class TypeTestApp(App):
         self.time_left = 60
         self.words_typed = 0
         self.accuracy = 100
+        self.wpm = 0
         self.game_active = True
+        self.start_time = time.time()
         self.next_word()
         Clock.schedule_interval(self.update_timer, 1)
 
     def next_word(self):
-        self.current_word = random.choice(self.words)
+        self.current_word = self.r.get_random_word()
+        while not self.current_word:  # Ensure we get a valid word
+            self.current_word = self.r.get_random_word()
         self.word_label.text = self.current_word
 
     def check_word(self, instance):
@@ -65,7 +71,7 @@ class TypeTestApp(App):
             return
 
         typed_word = self.input.text.strip().lower()
-        if typed_word == self.current_word:
+        if typed_word == self.current_word.lower():
             self.words_typed += 1
             self.input.text = ""
             self.next_word()
@@ -83,20 +89,27 @@ class TypeTestApp(App):
             self.input.background_color = [1, 0, 0,
                                            1] if self.input.background_color == original_background else original_background
 
-        for i in range(6):
+        for i in range(6):  # Blink 3 times (6 color changes)
             Clock.schedule_once(blink, i * 0.2)
         Clock.schedule_once(lambda dt: setattr(self.input, 'background_color', original_background), 1.2)
 
     def update_timer(self, dt):
         self.time_left -= 1
         self.time_label.text = f"Time left: {self.time_left} seconds"
+        self.update_wpm()
         if self.time_left <= 0:
             self.end_game()
             return False
         return True
 
     def update_stats(self):
-        self.stats_label.text = f"Words typed: {self.words_typed} | Accuracy: {self.accuracy}%"
+        self.update_wpm()
+        self.stats_label.text = f"Words typed: {self.words_typed} | Accuracy: {self.accuracy}% | WPM: {self.wpm}"
+
+    def update_wpm(self):
+        elapsed_time = time.time() - self.start_time
+        minutes = elapsed_time / 60
+        self.wpm = round(self.words_typed / minutes, 2) if minutes > 0 else 0
 
     def end_game(self):
         self.game_active = False
@@ -104,6 +117,7 @@ class TypeTestApp(App):
         self.word_label.text = "Game Over!"
         self.start_button.disabled = False
         self.start_button.text = "Play Again"
+        self.update_stats()
 
 
 if __name__ == '__main__':
