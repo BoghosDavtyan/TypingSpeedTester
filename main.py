@@ -4,13 +4,15 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.clock import Clock
-from kivy.graphics import Color, Rectangle
 import random
 
 
-class BlinkingTextInput(TextInput):
-    def blink(self, dt):
-        self.background_color = [1, 0, 0, 1] if self.background_color == [1, 1, 1, 1] else [1, 1, 1, 1]
+class FocusTextInput(TextInput):
+    def keyboard_on_key_down(self, window, keycode, text, modifiers):
+        if keycode[1] == 'enter':
+            self.dispatch('on_text_validate')
+            return True
+        return super(FocusTextInput, self).keyboard_on_key_down(window, keycode, text, modifiers)
 
 
 class TypeTestApp(App):
@@ -31,7 +33,7 @@ class TypeTestApp(App):
         self.word_label = Label(text="Press 'Start' to begin", font_size=30)
         layout.add_widget(self.word_label)
 
-        self.input = BlinkingTextInput(multiline=False, font_size=30, disabled=True)
+        self.input = FocusTextInput(multiline=False, font_size=30, disabled=True)
         self.input.bind(on_text_validate=self.check_word)
         layout.add_widget(self.input)
 
@@ -72,19 +74,18 @@ class TypeTestApp(App):
             self.input.text = ""
             self.blink_textinput()
         self.update_stats()
-        self.input.focus = True
+        Clock.schedule_once(lambda dt: setattr(self.input, 'focus', True), 0.1)
 
     def blink_textinput(self):
-        blink_count = 0
+        original_background = self.input.background_color
 
         def blink(dt):
-            nonlocal blink_count
-            self.input.blink(dt)
-            blink_count += 1
-            if blink_count >= 6:
-                return False
+            self.input.background_color = [1, 0, 0,
+                                           1] if self.input.background_color == original_background else original_background
 
-        Clock.schedule_interval(blink, 0.2)
+        for i in range(6):
+            Clock.schedule_once(blink, i * 0.2)
+        Clock.schedule_once(lambda dt: setattr(self.input, 'background_color', original_background), 1.2)
 
     def update_timer(self, dt):
         self.time_left -= 1
